@@ -102,7 +102,6 @@ dispose();
 | `builtins.typescript` | `boolean` | `true` | Load TypeScript built-in types |
 | `builtins.node` | `boolean` | `true` | Load Node.js types |
 | `builtins.deno` | `boolean` | `false` | Load Deno types |
-| `builtins.bun` | `boolean` | `false` | Load Bun types |
 
 ## 🌐 Common NPM Mirrors
 
@@ -116,8 +115,6 @@ registry: 'https://registry.npmmirror.com'
 // CNPM mirror
 registry: 'https://r.cnpmjs.org'
 
-// Yarn mirror
-registry: 'https://registry.yarnpkg.com'
 ```
 
 ## 🔧 Development
@@ -146,6 +143,7 @@ npm run build
 # Run tests
 npm test
 
+```
 
 ## 📝 How It Works
 
