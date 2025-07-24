@@ -1,5 +1,5 @@
 import isBuiltinModule from "is-builtin-module";
-import { Project, Node, SyntaxKind } from 'ts-morph';
+import { Project, Node } from 'ts-morph';
 import { IDependency } from '../types/index.ts';
 
 // 匹配本地导入路径的正则表达式（如./或/开头的路径）

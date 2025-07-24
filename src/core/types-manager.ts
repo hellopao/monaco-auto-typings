@@ -1,12 +1,12 @@
-import { chunk } from '@std/collections';
-import { join, dirname } from '@std/path';
-import { concat } from '@std/bytes';
+import chunk from 'chunk';
+import * as path from 'path-browserify';
+import concat from 'concat-buffers';
+import { TarLocalFile } from '@andrewbranch/untar.js';
 import { IDependency, IInternalOptions, ILogger, ITypesResult } from '../types/index.ts';
 import { TypesCache } from './types-cache.ts';
 import { RegistryFactory } from './registry-factory.ts';
 import { escapeRegExp } from '../utils/index.ts';
 import { DependencyParser } from './dependency-parser.ts';
-import { TarLocalFile } from '@andrewbranch/untar.js';
 
 /**
  * 类型管理器
@@ -147,8 +147,8 @@ export class TypesManager {
 				if (typesFile) {
 					const refs = DependencyParser.getReferencesFromTypes(new TextDecoder("utf-8").decode(typesFile.fileData))
 					const refFiles = refs.map(ref => {
-						const path = join(dirname(typesFile.name), ref)
-						return files.find(item => item.name === path)!;
+						const dir = path.join(path.dirname(typesFile.name), ref)
+						return files.find(item => item.name === dir)!;
 					});
 					files = [{ name: typesFile.name, fileData: concat([typesFile.fileData, ...refFiles.map(file => file.fileData)]) }] as TarLocalFile[];
 				}

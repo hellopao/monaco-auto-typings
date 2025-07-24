@@ -1,7 +1,7 @@
 /// <reference path="../../node_modules/monaco-editor/monaco.d.ts" />
 
-import { debounce as debounceFn } from "@std/async";
-import { deepMerge } from "@std/collections";
+import debounceFn from "debounce";
+import deepMerge from "deepmerge";
 import { IAutoTypingsOptions, IInternalOptions } from '../types/index.ts';
 import { isValidUrl, createLogger } from '../utils/index.ts';
 import { DependencyParser } from './dependency-parser.ts';
