@@ -32,7 +32,7 @@ Deno.test("getDependenciesFromImports", () => {
     { name: "@std/async", version: "", registry: "jsr" },
     { name: "@std/assert", version: "", registry: "jsr" },
     { name: "node-fetch", version: "", registry: "npm" },
-    { name: "fs-extra", version: "@10.0.0", registry: "npm" },
+    { name: "fs-extra", version: "10.0.0", registry: "npm" },
     { name: "express", version: "", registry: "" },
   ]);
 });

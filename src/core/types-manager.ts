@@ -1,5 +1,5 @@
 import chunk from 'chunk';
-import * as path from 'path-browserify';
+import path from 'path-browserify';
 import concat from 'concat-buffers';
 import { TarLocalFile } from '@andrewbranch/untar.js';
 import { IDependency, IInternalOptions, ILogger, ITypesResult } from '../types/index.ts';
@@ -8,6 +8,7 @@ import { RegistryFactory } from './registry-factory.ts';
 import { escapeRegExp } from '../utils/index.ts';
 import { DependencyParser } from './dependency-parser.ts';
 
+console.log(path)
 /**
  * 类型管理器
  */
