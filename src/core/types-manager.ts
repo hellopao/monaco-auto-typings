@@ -68,13 +68,13 @@ export class TypesManager {
 		}
 
 		this.cache.setLoading(key);
+		this.cache.add(key);
 
 		try {
 			this.logger.info(`Loading type definitions for ${dependency.name}`);
 			const types = await this.fetchDependencyTypes(dependency);
 
 			if (types && types.length > 0) {
-				this.cache.add(key);
 				this.logger.info(`Successfully loaded type definitions for ${dependency.name}`);
 			} else {
 				this.logger.warn(`No type definitions found for ${dependency.name}`);

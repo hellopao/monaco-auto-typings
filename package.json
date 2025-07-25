@@ -1,6 +1,6 @@
 {
   "name": "monaco-auto-typings",
-  "version": "1.0.9",
+  "version": "1.0.10",
   "description": "provides automatic dependency type completion for Monaco Editor",
   "main": "dist/index.js",
   "module": "dist/index.esm.js",

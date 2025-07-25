@@ -5,7 +5,7 @@ import { IDependency } from '../types/index.ts';
 // 匹配本地导入路径的正则表达式（如./或/开头的路径）
 const LOCAL_IMPORT_REG = /^[\\/|\\.]/;
 // 匹配依赖项名称的正则表达式，解析格式如：registry:@scope/name@version
-const DEPENDENCY_REG = /^([^@]+:)?(@[^\/]+\/)?([^@]+)(@.+)?$/;
+const DEPENDENCY_REG = /^(?:(\w+):)?(?:(@\w+\/)?)([\w\-\.\/]+)(?:@([\w\-\.]+))?$/;
 
 /**
  * 依赖解析器类
@@ -59,7 +59,13 @@ export class DependencyParser {
 
 			// Import 语句 can directly get dependency names
 			sourceFile.getImportDeclarations().forEach((item) => {
-				imports.push(item.getModuleSpecifierValue())
+				try {
+					const imp = item.getModuleSpecifierValue();	
+					if (imp) {
+						imports.push(imp);
+					}
+				} catch (err) {
+				}
 			});
 
 			// require 语句

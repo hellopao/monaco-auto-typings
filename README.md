@@ -24,7 +24,7 @@ npm install monaco-auto-typings
 
 ```javascript
 import * as monaco from 'monaco-editor';
-import initialize from 'monaco-auto-typings';
+import autoTypings from 'monaco-auto-typings';
 
 // Create editor
 const editor = monaco.editor.create(document.getElementById('editor'), {
@@ -34,17 +34,14 @@ const editor = monaco.editor.create(document.getElementById('editor'), {
 });
 
 // Initialize auto typings plugin
-const autoTypings = await initialize(monaco, editor);
-
-// Dispose plugin (optional)
-// autoTypings.dispose();
+autoTypings(monaco, editor);
 ```
 
 ### Advanced Configuration
 
 ```javascript
 import * as monaco from 'monaco-editor';
-import initialize from 'monaco-auto-typings';
+import autoTypings from 'monaco-auto-typings';
 
 const editor = monaco.editor.create(document.getElementById('editor'), {
   value: 'import express from "express";\n\nconst app = express();\n',
@@ -52,7 +49,7 @@ const editor = monaco.editor.create(document.getElementById('editor'), {
 });
 
 // Initialize plugin with custom configuration
-const autoTypings = await initialize(monaco, editor, {
+autoTypings(monaco, editor, {
   // Use Taobao NPM mirror
   registry: 'https://registry.npmmirror.com',
   // Set debounce time to 500ms
@@ -72,17 +69,14 @@ const autoTypings = await initialize(monaco, editor, {
 ### Using Class Approach
 
 ```javascript
-import { MonacoAutoTypings } from 'monaco-auto-typings';
+import autoTypings from 'monaco-auto-typings';
 
-const autoTypings = new MonacoAutoTypings(monaco, editor, {
+const disposable = autoTypings(monaco, editor, {
   registry: 'https://registry.npmjs.org',
   verbose: true
 });
 
-const { dispose } = await autoTypings.initialize();
-
-// Dispose plugin
-dispose();
+// disposable.dispose();
 ```
 
 ## ⚙️ Configuration Options
