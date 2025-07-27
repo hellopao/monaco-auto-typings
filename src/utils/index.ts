@@ -44,17 +44,17 @@ export function escapeRegExp(string: string): string {
  */
 export function createLogger(verbose: boolean) {
   return {
-    info: (message: string, ...args: any[]) => {
+    info: (message: string, ...args: any[]): void => {
       if (verbose) {
         console.log(`[Monaco Auto Typings] ${message}`, ...args);
       }
     },
-    error: (message: string, ...args: any[]) => {
+    error: (message: string, ...args: any[]): void => {
       if (verbose) {
         console.error(`[Monaco Auto Typings] ${message}`, ...args);
       }
     },
-    warn: (message: string, ...args: any[]) => {
+    warn: (message: string, ...args: any[]): void => {
       if (verbose) {
         console.warn(`[Monaco Auto Typings] ${message}`, ...args);
       }

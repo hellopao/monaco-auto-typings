@@ -1,5 +1,5 @@
-import { MonacoAutoTypings } from './core/auto-typings.ts';
-import { IAutoTypingsOptions } from './types/index.ts';
+import { MonacoAutoTypings, Monaco, MonacoEditor } from './core/auto-typings';
+import { IAutoTypingsOptions } from './types/index';
 
 /**
  * 初始化自动类型提示功能
@@ -8,8 +8,8 @@ import { IAutoTypingsOptions } from './types/index.ts';
  * @param options 配置选项
  */
 export default function initialize(
-  monaco,
-  editor: monaco.editor.IStandaloneCodeEditor,
+  monaco: Monaco,
+  editor: MonacoEditor,
   options: IAutoTypingsOptions = {}
 ): Promise<{ dispose: () => void }> {
   const autoTypings = new MonacoAutoTypings(options);

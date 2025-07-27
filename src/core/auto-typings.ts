@@ -1,13 +1,14 @@
-/// <reference path="../../node_modules/monaco-editor/monaco.d.ts" />
-
 import debounceFn from "debounce";
 import deepMerge from "deepmerge";
-import { IAutoTypingsOptions, IInternalOptions } from '../types/index.ts';
-import { isValidUrl, createLogger } from '../utils/index.ts';
-import { DependencyParser } from './dependency-parser.ts';
-import { TypesManager } from './types-manager.ts';
-import { DEFAULT_OPTIONS } from '../config/index.ts';
+import { IAutoTypingsOptions, IInternalOptions } from '../types/index';
+import { isValidUrl, createLogger } from '../utils/index';
+import { DependencyParser } from './dependency-parser';
+import { TypesManager } from './types-manager';
+import { DEFAULT_OPTIONS } from '../config/index';
 
+export type Monaco = typeof import('monaco-editor');
+export type MonacoEditor = import('monaco-editor').editor.IStandaloneCodeEditor;
+export type MonacoDisposable = import('monaco-editor').IDisposable;
 /**
  * Monaco自动类型提示核心类
  */
@@ -15,7 +16,7 @@ export class MonacoAutoTypings {
 	private options: IInternalOptions;
 	private logger: ReturnType<typeof createLogger>;
 	private typesManager: TypesManager;
-	private disposable: monaco.IDisposable | null;
+	private disposable: MonacoDisposable | null = null;
 
 	// 默认配置选项
 	private static readonly defaultOptions: IInternalOptions = DEFAULT_OPTIONS;
@@ -48,7 +49,7 @@ export class MonacoAutoTypings {
 	/**
 	 * 初始化插件
 	 */
-	public async initialize(monaco, editor: monaco.editor.IStandaloneCodeEditor): Promise<{ dispose: () => void }> {
+	public async initialize(monaco: Monaco, editor: MonacoEditor): Promise<{ dispose: () => void }> {
 		try {
 			// 加载内置类型定义
 			if (this.options.builtins && Object.values(this.options.builtins).some(Boolean)) {
@@ -79,14 +80,14 @@ export class MonacoAutoTypings {
 	/**
 	 * 添加类型定义
 	 */
-	private createTypescriptExtraLibs(monaco, types: string[]) {
+	private createTypescriptExtraLibs(monaco: Monaco, types: string[]) {
 		types.forEach(content => monaco.languages.typescript.typescriptDefaults.addExtraLib(content));
 	}
 
 	/**
 	 * 创建代码变更处理函数
 	 */
-	private createCodeChangeHandler(monaco, editor) {
+	private createCodeChangeHandler(monaco: Monaco, editor: MonacoEditor) {
 		return async () => {
 			try {
 				const model = editor.getModel();

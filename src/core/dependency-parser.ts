@@ -1,6 +1,6 @@
 import isBuiltinModule from "is-builtin-module";
 import { Project, Node } from 'ts-morph';
-import { IDependency } from '../types/index.ts';
+import { IDependency } from '../types/index';
 
 // 匹配本地导入路径的正则表达式（如./或/开头的路径）
 const LOCAL_IMPORT_REG = /^[\\/|\\.]/;
@@ -95,7 +95,7 @@ export class DependencyParser {
 	 * @param code 
 	 * @returns 提取到的类型声明
 	 */
-	public static getReferencesFromTypes(code: string) {
+	public static getReferencesFromTypes(code: string): string[] {
 		const refs: string[] = [];
 		try {
 			const project = new Project({ useInMemoryFileSystem: true });

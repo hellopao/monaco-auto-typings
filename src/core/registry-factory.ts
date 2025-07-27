@@ -1,7 +1,7 @@
 import { inflate } from "pako";
 import { untar, TarLocalFile } from "@andrewbranch/untar.js";
-import { IDependency, IPackageInfo, ITypesResult } from '../types/index.ts';
-import { fetchWithTimeout } from '../utils/index.ts';
+import { IDependency, IPackageInfo, ITypesResult } from '../types/index';
+import { fetchWithTimeout } from '../utils/index';
 
 /**
  * 注册表管理器基类

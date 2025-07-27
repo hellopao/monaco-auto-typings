@@ -1,4 +1,4 @@
-import { IInternalOptions } from '../types/index.ts';
+import { IInternalOptions } from '../types';
 
 /**
  * 默认配置选项

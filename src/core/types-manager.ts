@@ -1,14 +1,13 @@
 import chunk from 'chunk';
 import path from 'path-browserify';
-import concat from 'concat-buffers';
+import { concat } from 'uint8arrays/concat'
 import { TarLocalFile } from '@andrewbranch/untar.js';
-import { IDependency, IInternalOptions, ILogger, ITypesResult } from '../types/index.ts';
-import { TypesCache } from './types-cache.ts';
-import { RegistryFactory } from './registry-factory.ts';
-import { escapeRegExp } from '../utils/index.ts';
-import { DependencyParser } from './dependency-parser.ts';
+import { IDependency, IInternalOptions, ILogger, ITypesResult } from '../types/index';
+import { TypesCache } from './types-cache';
+import { RegistryFactory } from './registry-factory';
+import { escapeRegExp } from '../utils/index';
+import { DependencyParser } from './dependency-parser';
 
-console.log(path)
 /**
  * 类型管理器
  */
@@ -46,7 +45,7 @@ export class TypesManager {
 		}
 
 		// 限制并发数量
-		const chunks = chunk(newDependencies, this.options.maxConcurrency);
+		const chunks: Array<IDependency[]> = chunk(newDependencies, this.options.maxConcurrency);
 
 		const types: string[] = [];
 		for (const chunk of chunks) {
