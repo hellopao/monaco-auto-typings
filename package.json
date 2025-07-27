@@ -16,11 +16,7 @@
     "README.md"
   ],
   "scripts": {
-    "build": "npm run build:types && npm run build:cjs && npm run build:esm && npm run build:bundle",
-    "build:types": "tsc -p tsconfig.json --emitDeclarationOnly --outDir dist",
-    "build:cjs": "tsc -p tsconfig.cjs.json",
-    "build:esm": "tsc -p tsconfig.esm.json",
-    "build:bundle": "npx vite build",
+    "build": "vite build && tsc",
     "dev": "tsc --watch",
     "test": "npx deno run -A test/index.ts",
     "preview": "open examples/basic-usage.html"
