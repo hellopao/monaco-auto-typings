@@ -9,6 +9,7 @@ import { DEFAULT_OPTIONS } from '../config/index';
 export type Monaco = typeof import('monaco-editor');
 export type MonacoEditor = import('monaco-editor').editor.IStandaloneCodeEditor;
 export type MonacoDisposable = import('monaco-editor').IDisposable;
+
 /**
  * Monaco自动类型提示核心类
  */
@@ -49,16 +50,15 @@ export class MonacoAutoTypings {
 	/**
 	 * 初始化插件
 	 */
-	public async initialize(monaco: Monaco, editor: MonacoEditor): Promise<{ dispose: () => void }> {
+	public initialize(monaco: Monaco, editor: MonacoEditor): { dispose: () => void } {
 		try {
 			// 加载内置类型定义
 			if (this.options.builtins && Object.values(this.options.builtins).some(Boolean)) {
-				try {
-					const types = await this.typesManager.createBuiltinTypes();
+				this.typesManager.createBuiltinTypes().then(types => {
 					this.createTypescriptExtraLibs(monaco, types);
-				} catch (error) {
+				}).catch(error => {
 					this.logger.error('Failed to load built-in types:', error);
-				}
+				});
 			}
 
 			// 创建代码变更处理函数并添加防抖
@@ -81,7 +81,14 @@ export class MonacoAutoTypings {
 	 * 添加类型定义
 	 */
 	private createTypescriptExtraLibs(monaco: Monaco, types: string[]) {
-		types.forEach(content => monaco.languages.typescript.typescriptDefaults.addExtraLib(content));
+		types.forEach(content => {
+			if (this.options.languages.includes('javascript')) {
+				monaco.languages.typescript.javascriptDefaults.addExtraLib(content)
+			}
+			if (this.options.languages.includes('typescript')) {
+				monaco.languages.typescript.typescriptDefaults.addExtraLib(content)
+			}
+		});
 	}
 
 	/**
