@@ -9,19 +9,13 @@ export default defineConfig({
     lib: {
       entry: resolve(__dirname, 'src/index.ts'),
       name: 'MonacoAutoTypings',
-      formats: ['es', 'cjs', 'iife'],
-      fileName: (format) => {
-        switch (format) {
-          case 'es':
-            return 'index.esm.js';
-          case 'cjs':
-            return 'index.js';
-          case 'iife':
-            return 'index.iife.js';
-          default:
-            return 'index.js';
-        }
-      }
+      formats: ['iife'],
+      fileName: () => 'index.iife.js'
     },
+    rollupOptions: {
+      output: {
+        name: 'MonacoAutoTypings'
+      }
+    }
   }
 });
