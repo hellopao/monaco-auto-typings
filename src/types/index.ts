@@ -1,5 +1,7 @@
 import { TarLocalFile } from "@andrewbranch/untar.js";
 
+export type ILanguage = "javascript" | "typescript";
+
 /**
  * 依赖项信息接口
  */
@@ -31,6 +33,8 @@ export interface IAutoTypingsOptions {
   verbose?: boolean;
   /** 最大并发请求数 */
   maxConcurrency?: number;
+  /** 语言 */
+  languages?: Array<ILanguage>;
 }
 
 /**
