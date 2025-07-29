@@ -1,5 +1,5 @@
 import isBuiltinModule from "is-builtin-module";
-import { Project, Node } from 'ts-morph';
+import ts from 'typescript';
 import { IDependency } from '../types/index';
 
 // 匹配本地导入路径的正则表达式（如./或/开头的路径）
@@ -54,35 +54,43 @@ export class DependencyParser {
 		const imports: string[] = [];
 
 		try {
-			const project = new Project({ useInMemoryFileSystem: true });
-			const sourceFile = project.createSourceFile("__temp__.ts", code);
+			const sourceFile = ts.createSourceFile(
+				'__temp__.ts',
+				code,
+				ts.ScriptTarget.Latest,
+				true
+			);
 
-			// Import 语句 can directly get dependency names
-			sourceFile.getImportDeclarations().forEach((item) => {
-				try {
-					const imp = item.getModuleSpecifierValue();	
-					if (imp) {
-						imports.push(imp);
+			function visitNode(node: ts.Node, dependencies: string[]) {
+				// 处理 import 语句
+				if (ts.isImportDeclaration(node)) {
+					const moduleSpecifier = node.moduleSpecifier;
+					if (ts.isStringLiteral(moduleSpecifier)) {
+						dependencies.push(moduleSpecifier.text)
 					}
-				} catch (err) {
 				}
-			});
-
-			// require 语句
-			sourceFile.forEachDescendant((node: any) => {
-				if (Node.isCallExpression(node)) {
-					const expression = node.getExpression();
-
-					if (expression.getText() === 'require') {
-						const args = node.getArguments();
-						if (args.length > 0) {
-							imports.push(args[0].getText().replace(/['"`]/g, ''));
+				// 处理动态 import()
+				else if (ts.isCallExpression(node)) {
+					if (node.expression.kind === ts.SyntaxKind.ImportKeyword) {
+						const arg = node.arguments[0];
+						if (ts.isStringLiteral(arg)) {
+							dependencies.push(arg.text)
+						}
+					}
+					// 处理 require()
+					else if (ts.isIdentifier(node.expression) && node.expression.text === 'require') {
+						const arg = node.arguments[0];
+						if (ts.isStringLiteral(arg)) {
+							dependencies.push(arg.text)
 						}
 					}
 				}
-			})
 
-			project.removeSourceFile(sourceFile);
+				// 递归遍历子节点
+				ts.forEachChild(node, child => visitNode(child, dependencies));
+			}
+
+			visitNode(sourceFile, imports);
 		} catch (error) {
 			console.error('Failed to parse source code:', error);
 		}
@@ -98,14 +106,15 @@ export class DependencyParser {
 	public static getReferencesFromTypes(code: string): string[] {
 		const refs: string[] = [];
 		try {
-			const project = new Project({ useInMemoryFileSystem: true });
-			const sourceFile = project.createSourceFile('__temp__.d.ts', code);
-
-			sourceFile.getPathReferenceDirectives().forEach(item => {
-				refs.push(item.getText());
-			});
-
-			project.removeSourceFile(sourceFile);
+			const sourceFile = ts.createSourceFile(
+				'__temp__.d.ts',
+				code,
+				ts.ScriptTarget.Latest,
+				true
+			);
+			(sourceFile.referencedFiles || []).forEach(item => {
+				refs.push(item.fileName)
+			})
 		} catch (error) {
 		}
 
