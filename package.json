@@ -2,13 +2,16 @@
   "name": "monaco-auto-typings",
   "version": "1.0.14",
   "description": "provides automatic dependency type completion for Monaco Editor",
-  "main": "dist/index.js",
-  "module": "dist/index.esm.js",
+  "main": "dist/cjs/index.js",
+  "module": "dist/esm/index.js",
+  "browser": "dist/index.iife.js",
+  "types": "dist/types/index.d.ts",
   "exports": {
     ".": {
-      "import": "./dist/index.esm.js",
-      "require": "./dist/index.js",
-      "types": "./dist/index.d.ts"
+      "import": "./dist/esm/index.js",
+      "require": "./dist/cjs/index.js",
+      "browser": "./dist/index.iife.js",
+      "types": "./dist/types/index.d.ts"
     }
   },
   "files": [
@@ -16,7 +19,10 @@
     "README.md"
   ],
   "scripts": {
-    "build": "vite build && tsc",
+    "build": "npm run build:iife && npm run build:cjs && npm run build:esm",
+    "build:iife": "vite build",
+    "build:cjs": "tsc -p tsconfig.cjs.json",
+    "build:esm": "tsc -p tsconfig.esm.json",
     "dev": "tsc --watch",
     "test": "npx deno run -A test/index.ts",
     "preview": "open examples/basic-usage.html"
