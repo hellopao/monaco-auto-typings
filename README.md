@@ -12,6 +12,8 @@ Monaco Auto Typings is a plugin that provides automatic dependency type completi
 - 🌐 **Mirror Support** - Support for custom NPM mirrors to improve download speed
 - 📝 **Detailed Logging** - Optional detailed log output for debugging
 
+  ![demo](https://github.com/hellopao/monaco-auto-typings/blob/main/test/fixture.gif)
+
 ## 📦 Installation
 
 ```bash
