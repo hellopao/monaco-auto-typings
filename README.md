@@ -64,7 +64,9 @@ autoTypings(monaco, editor, {
   // Enable verbose logging
   verbose: true,
   // Set maximum concurrency
-  maxConcurrency: 3
+  maxConcurrency: 3,
+  // set languages
+  languages: ["typescript", "javascript"]
 });
 ```
 
@@ -90,6 +92,7 @@ const disposable = autoTypings(monaco, editor, {
 | `verbose` | `boolean` | `false` | Enable detailed logging |
 | `maxConcurrency` | `number` | `5` | Maximum concurrent requests |
 | `builtins` | `object` | See below | Built-in type support configuration |
+| `languages` | `string[]` | `['typescript']` | support languages(typescript/javascript) |
 
 ### Built-in Type Configuration
 
