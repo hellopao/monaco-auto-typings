@@ -2,7 +2,10 @@
   "tasks": {
     "test": "deno test -A test/index.ts --no-check --unstable-sloppy-imports",
     "preview": "open examples/basic-usage.html",
-    "build": "rm -rf dist && vite build && tsc"
+    "build": "rm -rf dist && npm run build:iife && npm run build:cjs && npm run build:esm",
+    "build:iife": "vite build",
+    "build:cjs": "tsc -p tsconfig.cjs.json",
+    "build:esm": "tsc -p tsconfig.esm.json"
   },
   "imports": {
     "@std/assert": "jsr:@std/assert@1"
