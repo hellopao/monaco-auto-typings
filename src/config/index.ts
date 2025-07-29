@@ -14,4 +14,5 @@ export const DEFAULT_OPTIONS: IInternalOptions = {
   },
   verbose: false,
   maxConcurrency: 5,
+  languages: ['typescript']
 };
