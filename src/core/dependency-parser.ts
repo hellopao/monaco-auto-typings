@@ -95,7 +95,7 @@ export class DependencyParser {
 			console.error('Failed to parse source code:', error);
 		}
 
-		return imports;
+		return Array.from(new Set(imports));
 	}
 
 	/**
