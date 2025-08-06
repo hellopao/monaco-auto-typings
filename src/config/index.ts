@@ -16,3 +16,13 @@ export const DEFAULT_OPTIONS: IInternalOptions = {
   maxConcurrency: 5,
   languages: ['typescript']
 };
+
+/**
+ * 内置类型对应的包名
+ */
+export const BUILTIN_PACKAGES = {
+  typescript: 'typescript',
+  node: '@types/node',
+  deno: '@types/deno',
+  bun: 'bun-types'
+};

@@ -2,6 +2,8 @@ import { TarLocalFile } from "@andrewbranch/untar.js";
 
 export type ILanguage = "javascript" | "typescript";
 
+export type IBuiltinTypes = "typescript" | "node" | "deno" | "bun";
+
 /**
  * 依赖项信息接口
  */
@@ -23,12 +25,7 @@ export interface IAutoTypingsOptions {
   /** 防抖延迟时间(毫秒) */
   debounce?: number;
   /** 内置类型支持配置 */
-  builtins?: {
-    typescript?: boolean;
-    node?: boolean;
-    deno?: boolean;
-    bun?: boolean;
-  };
+  builtins?: Record<IBuiltinTypes, boolean>;
   /** 是否启用详细日志 */
   verbose?: boolean;
   /** 最大并发请求数 */

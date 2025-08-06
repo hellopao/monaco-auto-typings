@@ -49,6 +49,12 @@ Deno.test("getBuiltinTypes#node", async () => {
   );
 });
 
+Deno.test("getBuiltinTypes#bun", async () => {
+  const types = await typesManager.fetchBuiltinTypes(
+    'bun'
+  );
+});
+
 Deno.test("getBuiltinTypes#typescript", async () => {
   const types = await typesManager.fetchBuiltinTypes(
     'typescript',

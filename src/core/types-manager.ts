@@ -2,11 +2,12 @@ import chunk from 'chunk';
 import path from 'path-browserify';
 import { concat } from 'uint8arrays/concat'
 import { TarLocalFile } from '@andrewbranch/untar.js';
-import { IDependency, IInternalOptions, ILogger, ITypesResult } from '../types/index';
+import { IDependency, IBuiltinTypes, IInternalOptions, ILogger, ITypesResult } from '../types/index';
 import { TypesCache } from './types-cache';
 import { RegistryFactory } from './registry-factory';
 import { escapeRegExp } from '../utils/index';
 import { DependencyParser } from './dependency-parser';
+import { BUILTIN_PACKAGES } from '../config';
 
 /**
  * 类型管理器
@@ -210,7 +211,7 @@ export class TypesManager {
 				.map(async ([name]) => {
 					try {
 						this.logger.info(`Loading built-in types for ${name}`);
-						const types = await this.fetchBuiltinTypes(name);
+						const types = await this.fetchBuiltinTypes(name as IBuiltinTypes);
 
 						if (types && types.length > 0) {
 							this.logger.info(`Successfully loaded built-in types for ${name}`);
@@ -236,24 +237,24 @@ export class TypesManager {
 	/**
 	 * 获取内置类型定义
 	 */
-	public async fetchBuiltinTypes(mod: string): Promise<string[]> {
+	public async fetchBuiltinTypes(mod: IBuiltinTypes): Promise<string[]> {
 		try {
 			if (!mod) {
 				throw new Error('Module name cannot be empty');
 			}
 
 			// 根据模块名称确定包名
-			const name = mod === "typescript" ? mod : `@types/${mod}`;
+			const builtinPkgName = BUILTIN_PACKAGES[mod];
 
-			this.logger.info(`Getting built-in types: ${name}`);
+			this.logger.info(`Getting built-in ${mod} types: ${builtinPkgName}`);
 
 			const npmRegistry = RegistryFactory.getNPMRegistry(this.options.registry);
 
 			// 获取类型定义文件
-			const { files } = await npmRegistry.getDependencyTypes({ name, version: "" });
+			const { files } = await npmRegistry.getDependencyTypes({ name: builtinPkgName, version: "" });
 
 			if (files.length === 0) {
-				this.logger.warn(`No built-in type definitions found for ${name}`);
+				this.logger.warn(`No built-in type definitions found for ${mod}`);
 				return [];
 			}
 

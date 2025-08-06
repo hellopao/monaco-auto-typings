@@ -8,7 +8,7 @@ Monaco Auto Typings is a plugin that provides automatic dependency type completi
 - 📦 **Multiple Registry Support** - Supports NPM and JSR registries
 - 🚀 **High-Performance Cache** - Type definition caching to avoid repeated loading
 - ⚡ **Concurrency Control** - Configurable number of concurrent requests for optimized performance
-- 🛠️ **Built-in Type Support** - Support for Node.js, Deno built-in types
+- 🛠️ **Built-in Type Support** - Support for Node.js, Deno, Bun built-in types
 - 🌐 **Mirror Support** - Support for custom NPM mirrors to improve download speed
 - 📝 **Detailed Logging** - Optional detailed log output for debugging
 
@@ -59,7 +59,8 @@ autoTypings(monaco, editor, {
   // Configure built-in types
   builtins: {
     node: true,
-    deno: false
+    deno: false,
+    bun: false
   },
   // Enable verbose logging
   verbose: true,
@@ -101,6 +102,7 @@ const disposable = autoTypings(monaco, editor, {
 | `builtins.typescript` | `boolean` | `true` | Load TypeScript built-in types |
 | `builtins.node` | `boolean` | `true` | Load Node.js types |
 | `builtins.deno` | `boolean` | `false` | Load Deno types |
+| `builtins.bun` | `boolean` | `false` | Load Bun types |
 
 ## 🌐 Common NPM Mirrors
 
