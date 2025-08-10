@@ -34,7 +34,15 @@ export class DependencyParser {
 				const version = pkgVersion || "";
 				const registry = pkgRegistry?.split(':').shift() || "";
 
-				dependencies.push({ name, version, registry });
+				let key = name;
+				if (version) {
+					key = `${name}@${version}`;
+				}
+				if (registry) {
+					key = `${registry}:${key}`;
+				}
+
+				dependencies.push({ name, version, registry, key });
 			}
 		}
 

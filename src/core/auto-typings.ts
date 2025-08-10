@@ -1,6 +1,6 @@
 import debounceFn from "debounce";
 import deepMerge from "deepmerge";
-import { IAutoTypingsOptions, IInternalOptions } from '../types/index';
+import { IAutoTypingsOptions, IInternalOptions, ITsExtraLib } from '../types/index';
 import { isValidUrl, createLogger } from '../utils/index';
 import { DependencyParser } from './dependency-parser';
 import { TypesManager } from './types-manager';
@@ -80,13 +80,15 @@ export class MonacoAutoTypings {
 	/**
 	 * 添加类型定义
 	 */
-	private createTypescriptExtraLibs(monaco: Monaco, types: string[]) {
-		types.forEach(content => {
+	private createTypescriptExtraLibs(monaco: Monaco, libs: Array<ITsExtraLib>) {
+		libs.forEach(lib => {
+			const { key, filename, content } = lib;
+			const filepath = `${key}/${filename}`;
 			if (this.options.languages.includes('javascript')) {
-				monaco.languages.typescript.javascriptDefaults.addExtraLib(content)
+				monaco.languages.typescript.javascriptDefaults.addExtraLib(content, filepath);
 			}
 			if (this.options.languages.includes('typescript')) {
-				monaco.languages.typescript.typescriptDefaults.addExtraLib(content)
+				monaco.languages.typescript.typescriptDefaults.addExtraLib(content, filepath);
 			}
 		});
 	}

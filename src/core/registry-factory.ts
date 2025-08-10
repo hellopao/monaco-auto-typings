@@ -53,7 +53,7 @@ export class NPMRegistry extends BaseRegistry {
   /**
    * 从NPM获取依赖的类型定义文件
    */
-  public async getDependencyTypes(dependency: Omit<IDependency, "registry">): Promise<ITypesResult> {
+  public async getDependencyTypes(dependency: Pick<IDependency, "name" | "version">): Promise<ITypesResult> {
     const result: ITypesResult = { types: "", files: [] };
     
     try {
@@ -109,7 +109,7 @@ export class JSRRegistry extends BaseRegistry {
   /**
    * 从JSR获取依赖的类型定义文件
    */
-  public async getDependencyTypes(dependency: Omit<IDependency, "registry">): Promise<ITypesResult> {
+  public async getDependencyTypes(dependency: Pick<IDependency, "name" | "version">): Promise<ITypesResult> {
     try {
       let { name, version } = dependency;
       

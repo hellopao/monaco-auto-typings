@@ -2,12 +2,12 @@ import chunk from 'chunk';
 import path from 'path-browserify';
 import { concat } from 'uint8arrays/concat'
 import { TarLocalFile } from '@andrewbranch/untar.js';
-import { IDependency, IBuiltinTypes, IInternalOptions, ILogger, ITypesResult } from '../types/index';
+import { IDependency, IBuiltinTypes, IInternalOptions, ILogger, ITypesResult, ITsExtraLib } from '../types/index';
 import { TypesCache } from './types-cache';
 import { RegistryFactory } from './registry-factory';
 import { escapeRegExp } from '../utils/index';
 import { DependencyParser } from './dependency-parser';
-import { BUILTIN_PACKAGES } from '../config';
+import { BUILTIN_PACKAGES as BUILTIN_LIBS } from '../config';
 
 /**
  * 类型管理器
@@ -26,7 +26,7 @@ export class TypesManager {
 	/**
 	 * 加载依赖的类型定义
 	 */
-	public async createDenpendencyTypes(dependencies: IDependency[]): Promise<string[]> {
+	public async createDenpendencyTypes(dependencies: IDependency[]): Promise<Array<ITsExtraLib>> {
 		if (dependencies.length === 0) {
 			this.logger.info('No external dependencies found');
 			return [];
@@ -48,7 +48,7 @@ export class TypesManager {
 		// 限制并发数量
 		const chunks: Array<IDependency[]> = chunk(newDependencies, this.options.maxConcurrency);
 
-		const types: string[] = [];
+		const types: Array<ITsExtraLib> = [];
 		for (const chunk of chunks) {
 			const result = await Promise.all(
 				chunk.map(dependency => this.loadSingleDependencyTypes(dependency))
@@ -61,7 +61,7 @@ export class TypesManager {
 	/**
 	 * 加载单个依赖的类型定义
 	 */
-	private async loadSingleDependencyTypes(dependency: IDependency): Promise<string[]> {
+	private async loadSingleDependencyTypes(dependency: IDependency): Promise<Array<ITsExtraLib>> {
 		const key = `${dependency.name}@${dependency.version || 'latest'}`;
 
 		if (this.cache.has(key) || this.cache.isLoading(key)) {
@@ -92,9 +92,10 @@ export class TypesManager {
 	/**
 	 * 获取依赖的类型定义内容
 	 */
-	public async fetchDependencyTypes(dependency: IDependency): Promise<string[]> {
+	public async fetchDependencyTypes(dependency: IDependency): Promise<Array<ITsExtraLib>> {
+		const libs: Array<ITsExtraLib> = [];
 		try {
-			const { registry, name, version } = dependency;
+			const { registry, name, version, key } = dependency;
 
 			if (!name) {
 				throw new Error('Dependency name cannot be empty');
@@ -136,10 +137,10 @@ export class TypesManager {
 			}
 
 			if (types) {
-				const possiblePaths = [types, `package/${types}`, `${name}/${types}`, types.startsWith('./') ? types.slice(2) : types ];
+				const possiblePaths = [types, `package/${types}`, `${name}/${types}`, types.startsWith('./') ? types.slice(2) : types];
 				let typesFile: TarLocalFile | undefined;
 				for (const file of files) {
-					const matched = possiblePaths.find(path =>  path === file.name);
+					const matched = possiblePaths.find(path => path === file.name);
 					if (matched) {
 						typesFile = file;
 						break;
@@ -151,7 +152,7 @@ export class TypesManager {
 						const dir = path.join(path.dirname(typesFile.name), ref)
 						return files.find(item => item.name === dir)!;
 					});
-					files = [{ name: typesFile.name, fileData: concat([typesFile.fileData, ...refFiles.map(file => file.fileData)]) }] as TarLocalFile[];
+					files = [typesFile, ...refFiles];
 				}
 			}
 			// 生成模块名称
@@ -163,14 +164,19 @@ export class TypesManager {
 				'g'
 			);
 
+			/**
+			 * TODO
+			 * create declaration
+			 */
+
 			// 处理类型定义文件内容
-			return files.map((item) => {
+			for (const file of files) {
 				try {
-					let content = new TextDecoder("utf-8").decode(item.fileData);
+					let content = new TextDecoder("utf-8").decode(file.fileData);
 
 					if (!content.trim()) {
-						this.logger.warn(`Type definition file ${item.name} is empty`);
-						return '';
+						this.logger.warn(`Type definition file ${file.name} is empty`);
+						continue;
 					}
 
 					const newModuleKey = registry ? `${registry}:${moduleKey}` : moduleKey;
@@ -186,22 +192,25 @@ export class TypesManager {
 						);
 					}
 
-					return content;
+					libs.push({
+						key: name,
+						filename: file.name,
+						content
+					});
 				} catch (error) {
-					this.logger.error(`Failed to process type definition file ${item.name}:`, error);
-					return '';
+					this.logger.error(`Failed to process type definition file ${file.name}:`, error);
 				}
-			}).filter(content => content.trim().length > 0);
+			}
 		} catch (error) {
 			this.logger.error(`Failed to get type definitions for ${dependency.name}:`, error);
-			return [];
 		}
+		return libs;
 	}
 
 	/**
 	 * 加载内置类型定义
 	 */
-	public async createBuiltinTypes(): Promise<string[]> {
+	public async createBuiltinTypes(): Promise<Array<ITsExtraLib>> {
 		try {
 			this.logger.info('Starting to load built-in type definitions');
 
@@ -211,7 +220,7 @@ export class TypesManager {
 				.map(async ([name]) => {
 					try {
 						this.logger.info(`Loading built-in types for ${name}`);
-						const types = await this.fetchBuiltinTypes(name as IBuiltinTypes);
+						const types = await this.fetchBuiltinLibTypes(name as IBuiltinTypes);
 
 						if (types && types.length > 0) {
 							this.logger.info(`Successfully loaded built-in types for ${name}`);
@@ -237,42 +246,40 @@ export class TypesManager {
 	/**
 	 * 获取内置类型定义
 	 */
-	public async fetchBuiltinTypes(mod: IBuiltinTypes): Promise<string[]> {
+	public async fetchBuiltinLibTypes(lib: IBuiltinTypes): Promise<Array<ITsExtraLib>> {
+		const libs: Array<ITsExtraLib> = [];
 		try {
-			if (!mod) {
+			if (!lib) {
 				throw new Error('Module name cannot be empty');
 			}
 
 			// 根据模块名称确定包名
-			const builtinPkgName = BUILTIN_PACKAGES[mod];
+			const builtinLibTypesName = BUILTIN_LIBS[lib];
 
-			this.logger.info(`Getting built-in ${mod} types: ${builtinPkgName}`);
+			this.logger.info(`Getting built-in ${lib} types: ${builtinLibTypesName}`);
 
 			const npmRegistry = RegistryFactory.getNPMRegistry(this.options.registry);
 
 			// 获取类型定义文件
-			const { files } = await npmRegistry.getDependencyTypes({ name: builtinPkgName, version: "" });
+			const { files } = await npmRegistry.getDependencyTypes({ name: builtinLibTypesName, version: "" });
 
 			if (files.length === 0) {
-				this.logger.warn(`No built-in type definitions found for ${mod}`);
+				this.logger.warn(`No built-in type definitions found for ${lib}`);
 				return [];
 			}
 
 			// 解码文件内容并过滤空内容
-			return files
-				.map((item) => {
-					try {
-						const content = new TextDecoder("utf-8").decode(item.fileData);
-						return content.trim();
-					} catch (error) {
-						this.logger.error(`Failed to decode file ${item.name}:`, error);
-						return '';
-					}
-				})
-				.filter(content => content.length > 0);
+			for (const file of files) {
+				try {
+					const content = new TextDecoder("utf-8").decode(file.fileData);
+					libs.push({ key: lib, filename: file.name, content });
+				} catch (error) {
+					this.logger.error(`Failed to decode file ${file.name}:`, error);
+				}
+			}
 		} catch (error) {
-			this.logger.error(`Failed to get built-in types for ${mod}:`, error);
-			return [];
+			this.logger.error(`Failed to get built-in types for ${lib}:`, error);
 		}
+		return libs;
 	}
 }

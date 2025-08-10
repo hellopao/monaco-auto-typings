@@ -1,7 +1,13 @@
 import { TarLocalFile } from "@andrewbranch/untar.js";
 
+/**
+ * 语言
+ */
 export type ILanguage = "javascript" | "typescript";
 
+/**
+ * 内置类型支持
+ */
 export type IBuiltinTypes = "typescript" | "node" | "deno" | "bun";
 
 /**
@@ -14,6 +20,8 @@ export interface IDependency {
   name: string;
   /** 版本号 */
   version: string;
+  /** 原始依赖名称 */
+  key: string;
 }
 
 /**
@@ -59,6 +67,18 @@ export interface IPackageInfo {
 export interface ITypesResult {
   types: string;
   files: TarLocalFile[];
+}
+
+/**
+ * typescript额外类型定义
+ */
+export interface ITsExtraLib {
+  /** lib key */
+  key: string;
+  /** .d.ts文件名 */
+  filename: string;
+  /** .d.ts文件内容 */
+  content: string;
 }
 
 /**
