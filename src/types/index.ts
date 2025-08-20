@@ -20,8 +20,6 @@ export interface IDependency {
   name: string;
   /** 版本号 */
   version: string;
-  /** 原始依赖名称 */
-  key: string;
 }
 
 /**
@@ -64,8 +62,8 @@ export interface IPackageInfo {
 /**
  * 类型定义结果接口
  */
-export interface ITypesResult {
-  types: string;
+export interface IDependencyTypes {
+  entry: string;
   files: TarLocalFile[];
 }
 
@@ -73,13 +71,22 @@ export interface ITypesResult {
  * typescript额外类型定义
  */
 export interface ITsExtraLib {
-  /** lib key */
-  key: string;
-  /** .d.ts文件名 */
-  filename: string;
+  /** .d.ts文件路径 */
+  filepath: string;
   /** .d.ts文件内容 */
   content: string;
 }
+
+/**
+ * 类型文件声明信息
+ */
+export interface IDeclarationInfo {
+  type: "declare" | "export";
+  kind: string;
+  name: string;
+  text: string;
+}
+
 
 /**
  * 日志工具接口
