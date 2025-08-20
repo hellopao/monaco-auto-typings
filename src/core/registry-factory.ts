@@ -1,6 +1,6 @@
 import { inflate } from "pako";
 import { untar, TarLocalFile } from "@andrewbranch/untar.js";
-import { IDependency, IPackageInfo, ITypesResult } from '../types/index';
+import { IDependency, IPackageInfo, IDependencyTypes } from '../types/index';
 import { fetchWithTimeout } from '../utils/index';
 
 /**
@@ -39,7 +39,7 @@ abstract class BaseRegistry {
   /**
    * 获取依赖的类型定义文件
    */
-  abstract getDependencyTypes(dependency: Omit<IDependency, "registry">): Promise<ITypesResult>;
+  abstract getDependencyTypes(dependency: Omit<IDependency, "registry">): Promise<IDependencyTypes>;
 }
 
 /**
@@ -53,8 +53,8 @@ export class NPMRegistry extends BaseRegistry {
   /**
    * 从NPM获取依赖的类型定义文件
    */
-  public async getDependencyTypes(dependency: Pick<IDependency, "name" | "version">): Promise<ITypesResult> {
-    const result: ITypesResult = { types: "", files: [] };
+  public async getDependencyTypes(dependency: Pick<IDependency, "name" | "version">): Promise<IDependencyTypes> {
+    const result: IDependencyTypes = { entry: "", files: [] };
     
     try {
       const { name, version } = dependency;
@@ -87,7 +87,7 @@ export class NPMRegistry extends BaseRegistry {
       const tarballRes = await fetchWithTimeout(packageInfo.dist.tarball);
       const files = await this.untarDependencyPkg(tarballRes);
       
-      result.types = packageInfo.types || packageInfo.typings || "";
+      result.entry = packageInfo.types || packageInfo.typings || "";
       result.files = files.filter((item) => item.name.endsWith(".d.ts"));
       
       return result;
@@ -109,7 +109,7 @@ export class JSRRegistry extends BaseRegistry {
   /**
    * 从JSR获取依赖的类型定义文件
    */
-  public async getDependencyTypes(dependency: Pick<IDependency, "name" | "version">): Promise<ITypesResult> {
+  public async getDependencyTypes(dependency: Pick<IDependency, "name" | "version">): Promise<IDependencyTypes> {
     try {
       let { name, version } = dependency;
       
@@ -148,7 +148,7 @@ export class JSRRegistry extends BaseRegistry {
       
       // 只返回.d.ts类型定义文件
       return {
-        types: "",
+        entry: "",
         files: files.filter((item) => item.name.endsWith(".d.ts"))
       };
     } catch (error) {
