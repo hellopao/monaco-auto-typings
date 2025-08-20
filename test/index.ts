@@ -38,25 +38,25 @@ Deno.test("getDependenciesFromImports", () => {
 });
 
 Deno.test("getBuiltinTypes#deno", async () => {
-  const types = await typesManager.fetchBuiltinTypes(
+  const types = await typesManager.fetchBuiltinLibTypes(
     'deno'
   );
 });
 
 Deno.test("getBuiltinTypes#node", async () => {
-  const types = await typesManager.fetchBuiltinTypes(
+  const types = await typesManager.fetchBuiltinLibTypes(
     'node'
   );
 });
 
 Deno.test("getBuiltinTypes#bun", async () => {
-  const types = await typesManager.fetchBuiltinTypes(
+  const types = await typesManager.fetchBuiltinLibTypes(
     'bun'
   );
 });
 
 Deno.test("getBuiltinTypes#typescript", async () => {
-  const types = await typesManager.fetchBuiltinTypes(
+  const types = await typesManager.fetchBuiltinLibTypes(
     'typescript',
   );
 });
