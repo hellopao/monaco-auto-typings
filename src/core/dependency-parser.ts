@@ -34,15 +34,7 @@ export class DependencyParser {
 				const version = pkgVersion || "";
 				const registry = pkgRegistry?.split(':').shift() || "";
 
-				let key = name;
-				if (version) {
-					key = `${name}@${version}`;
-				}
-				if (registry) {
-					key = `${registry}:${key}`;
-				}
-
-				dependencies.push({ name, version, registry, key });
+				dependencies.push({ name, version, registry });
 			}
 		}
 
@@ -61,6 +53,36 @@ export class DependencyParser {
 
 		const imports: string[] = [];
 
+		// 将visitNode函数定义移到函数根作用域
+		function visitNode(node: ts.Node, dependencies: string[]) {
+			// 处理 import 语句
+			if (ts.isImportDeclaration(node)) {
+				const moduleSpecifier = node.moduleSpecifier;
+				if (ts.isStringLiteral(moduleSpecifier)) {
+					dependencies.push(moduleSpecifier.text)
+				}
+			}
+			// 处理动态 import()
+			else if (ts.isCallExpression(node)) {
+				if (node.expression.kind === ts.SyntaxKind.ImportKeyword) {
+					const arg = node.arguments[0];
+					if (ts.isStringLiteral(arg)) {
+						dependencies.push(arg.text)
+					}
+				}
+				// 处理 require()
+				else if (ts.isIdentifier(node.expression) && node.expression.text === 'require') {
+					const arg = node.arguments[0];
+					if (ts.isStringLiteral(arg)) {
+						dependencies.push(arg.text)
+					}
+				}
+			}
+
+			// 递归遍历子节点
+			ts.forEachChild(node, child => visitNode(child, dependencies));
+		}
+
 		try {
 			const sourceFile = ts.createSourceFile(
 				'__temp__.ts',
@@ -69,64 +91,12 @@ export class DependencyParser {
 				true
 			);
 
-			function visitNode(node: ts.Node, dependencies: string[]) {
-				// 处理 import 语句
-				if (ts.isImportDeclaration(node)) {
-					const moduleSpecifier = node.moduleSpecifier;
-					if (ts.isStringLiteral(moduleSpecifier)) {
-						dependencies.push(moduleSpecifier.text)
-					}
-				}
-				// 处理动态 import()
-				else if (ts.isCallExpression(node)) {
-					if (node.expression.kind === ts.SyntaxKind.ImportKeyword) {
-						const arg = node.arguments[0];
-						if (ts.isStringLiteral(arg)) {
-							dependencies.push(arg.text)
-						}
-					}
-					// 处理 require()
-					else if (ts.isIdentifier(node.expression) && node.expression.text === 'require') {
-						const arg = node.arguments[0];
-						if (ts.isStringLiteral(arg)) {
-							dependencies.push(arg.text)
-						}
-					}
-				}
-
-				// 递归遍历子节点
-				ts.forEachChild(node, child => visitNode(child, dependencies));
-			}
-
 			visitNode(sourceFile, imports);
 		} catch (error) {
 			console.error('Failed to parse source code:', error);
 		}
 
 		return Array.from(new Set(imports));
-	}
-
-	/**
-	 * 从.d.ts文件内容中查找引用
-	 * @param code 
-	 * @returns 提取到的类型声明
-	 */
-	public static getReferencesFromTypes(code: string): string[] {
-		const refs: string[] = [];
-		try {
-			const sourceFile = ts.createSourceFile(
-				'__temp__.d.ts',
-				code,
-				ts.ScriptTarget.Latest,
-				true
-			);
-			(sourceFile.referencedFiles || []).forEach(item => {
-				refs.push(item.fileName)
-			})
-		} catch (error) {
-		}
-
-		return refs;
 	}
 
 	/**
