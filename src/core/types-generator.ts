@@ -1,210 +1,191 @@
-import * as ts from 'typescript';
+import ts from "typescript";
+import path from "path-browserify";
+import {
+  IDeclarationInfo,
+  IDependency,
+  IDependencyTypes,
+  ITsExtraLib,
+} from "../types/index";
 
-interface DeclarationInfo {
-  type: 'declare' | 'export';
-  kind: string;
-  name: string;
-  text: string;
-  line: number;
-}
+export class TypesGenerator {
+  public dependency: IDependency;
+  public dependencyTypes: IDependencyTypes;
 
-/**
+  public dependencyModuleKey: string;
+
+  constructor(dependency: IDependency, dependencyTypes: IDependencyTypes) {
+    this.dependency = dependency;
+    this.dependencyTypes = dependencyTypes;
+    this.dependencyModuleKey = this.getDependencyModuleKey();
+  }
+
+  public generate() {
+    const { name, registry } = this.dependency;
+    const { entry = "index.d.ts", files } = this.dependencyTypes;
+    if (registry === 'jsr') {
+      return files.map(file => {
+        return {
+          filepath: `file:///${file.name}`,
+          content: this.createModuleDeclarationWrap(new TextDecoder("utf-8").decode(file.fileData))
+        }
+      })
+    }
+    const entryFile = files.find((file) => {
+      const entryFilename = entry.replace(/^\.\//, "");
+      const possibleFilenames = [
+        entryFilename,
+        `package/${entryFilename}`,
+        `${name}/${entryFilename}`,
+      ];
+      return possibleFilenames.some((filename) => filename === file.filename);
+    });
+    const extraLibs: Array<ITsExtraLib> = [];
+    if (!entryFile) {
+      return [];
+    }
+    if (entryFile) {
+      const code = new TextDecoder("utf-8").decode(entryFile.fileData);
+      const refs = this.getReferencesFromTypesFile(code);
+      if (refs.length > 0) {
+        const refFiles = refs.map((ref) =>
+          files.find((file) =>
+            file.name === path.join(path.dirname(entryFile.name), ref)
+          )!
+        );
+        extraLibs.push(...refFiles.map(file => {
+          return {
+            filepath: `file:///${file.name}`,
+            content: new TextDecoder("utf-8").decode(file.fileData)
+          }
+        }));
+      }
+      const moduleDeclarations = this.getModuleDeclarationsFromTypesFile(code);
+      if (moduleDeclarations.length === 0) {
+          extraLibs.push({
+            filepath: `file:///${entryFile.name}`,
+            content: code,
+          }, {
+            filepath: `file:///${this.dependency.name}/__types__.d.ts`,
+            content: this.createModuleDeclarations('', entryFile.name),
+          });
+      } else {
+        extraLibs.push({
+          filepath: `file:///${entryFile.name}`,
+          content: this.transformDeclarations(code),
+        });
+      }
+    }
+    return extraLibs;
+  }
+
+  /**
    * 从.d.ts文件内容中查找引用
-   * @param code 
+   * @param code
    * @returns 提取到的类型声明
    */
-export function getReferencesFromTypes(code: string): string[] {
-  const refs: string[] = [];
-  try {
+  private getReferencesFromTypesFile(code: string): string[] {
+    const refs: string[] = [];
+    try {
+      const sourceFile = ts.createSourceFile(
+        "__temp__.d.ts",
+        code,
+        ts.ScriptTarget.Latest,
+        true,
+      );
+      (sourceFile.referencedFiles || []).forEach((item) => {
+        refs.push(item.fileName);
+      });
+    } catch (error) {
+    }
+
+    return refs;
+  }
+
+  private getModuleDeclarationsFromTypesFile(code: string): IDeclarationInfo[] {
     const sourceFile = ts.createSourceFile(
-      '__temp__.d.ts',
+      "__temp__.d.ts",
       code,
       ts.ScriptTarget.Latest,
-      true
+      true,
     );
-    (sourceFile.referencedFiles || []).forEach(item => {
-      refs.push(item.fileName)
-    })
-  } catch (error) {
+
+    const declarations: IDeclarationInfo[] = [];
+
+    function visit(node: ts.Node) {
+      // 检查 declare module 和 declare namespace
+      if (ts.isModuleDeclaration(node)) {
+        const modifiers = (node as any).modifiers;
+        if (
+          modifiers &&
+          modifiers.some((m: any) => m.kind === ts.SyntaxKind.DeclareKeyword)
+        ) {
+          const isStringLiteral = node.name && ts.isStringLiteral(node.name);
+          const kind = isStringLiteral ? "module" : "namespace";
+          if (kind === "module") {
+            declarations.push({
+              type: "declare",
+              kind: kind,
+              name: node.name?.getText() || "unknown",
+              text: node.getText(),
+            });
+          }
+        }
+      }
+
+      ts.forEachChild(node, visit);
+    }
+
+    visit(sourceFile);
+    return declarations;
   }
 
-  return refs;
-}
+  private transformDeclarations(
+    code: string,
+  ): string {
+    const declarations = this.getModuleDeclarationsFromTypesFile(code);
 
-function parseDeclarations(code: string): DeclarationInfo[] {
-  const sourceFile = ts.createSourceFile(
-    '__temp__.d.ts',
-    code,
-    ts.ScriptTarget.Latest,
-    true
-  );
+    // 检查是否已经有 declare module
+    const hasModule = declarations.some((d) =>
+      d.type === "declare" && d.kind === "module"
+    );
 
-  const declarations: DeclarationInfo[] = [];
-
-  function visit(node: ts.Node) {
-    const sourceFile = node.getSourceFile();
-    const lineNumber = sourceFile.getLineAndCharacterOfPosition(node.getStart()).line + 1;
-
-    // 检查 declare const
-    if (ts.isVariableStatement(node)) {
-      const modifiers = (node as any).modifiers;
-      if (modifiers && modifiers.some((m: any) => m.kind === ts.SyntaxKind.DeclareKeyword)) {
-        node.declarationList.declarations.forEach(decl => {
-          declarations.push({
-            type: 'declare',
-            kind: 'const',
-            name: decl.name.getText(),
-            text: node.getText(),
-            line: lineNumber
-          });
-        });
-      }
+    if (hasModule) {
+      const reg = new RegExp(
+        `declare\s+module\s+["']${this.dependency.name}["']\s`,
+        "g",
+      );
+      return code.replace(reg, `declare module "${this.dependencyModuleKey}"`);
     }
 
-    // 检查 declare module 和 declare namespace
-    if (ts.isModuleDeclaration(node)) {
-      const modifiers = (node as any).modifiers;
-      if (modifiers && modifiers.some((m: any) => m.kind === ts.SyntaxKind.DeclareKeyword)) {
-        const isStringLiteral = node.name && ts.isStringLiteral(node.name);
-        const kind = isStringLiteral ? 'module' : 'namespace';
-
-        declarations.push({
-          type: 'declare',
-          kind: kind,
-          name: node.name?.getText() || 'unknown',
-          text: node.getText(),
-          line: lineNumber
-        });
-      }
-    }
-
-    // 检查 export = 
-    if (ts.isExportAssignment(node)) {
-      declarations.push({
-        type: 'export',
-        kind: 'assignment',
-        name: node.expression.getText(),
-        text: node.getText(),
-        line: lineNumber
-      });
-    }
-
-    // 检查 export as namespace
-    if (node.kind === ts.SyntaxKind.NamespaceExportDeclaration) {
-      declarations.push({
-        type: 'export',
-        kind: 'namespace',
-        name: (node as any).name?.getText() || 'unknown',
-        text: node.getText(),
-        line: lineNumber
-      });
-    }
-
-    // 检查带有 export 修饰符的声明
-    const modifiers = (node as any).modifiers;
-    if (modifiers && modifiers.some((m: any) => m.kind === ts.SyntaxKind.ExportKeyword)) {
-      let kind = 'unknown';
-      let name = 'unknown';
-
-      if (ts.isFunctionDeclaration(node)) {
-        kind = 'function';
-        name = node.name?.getText() || 'anonymous';
-      } else if (ts.isClassDeclaration(node)) {
-        kind = 'class';
-        name = node.name?.getText() || 'anonymous';
-      } else if (ts.isInterfaceDeclaration(node)) {
-        kind = 'interface';
-        name = node.name.getText();
-      } else if (ts.isTypeAliasDeclaration(node)) {
-        kind = 'type';
-        name = node.name.getText();
-      } else if (ts.isVariableStatement(node)) {
-        kind = 'const';
-        name = node.declarationList.declarations.map(d => d.name.getText()).join(', ');
-      } else if (ts.isModuleDeclaration(node)) {
-        kind = 'module';
-        name = node.name?.getText() || 'unknown';
-      }
-
-      declarations.push({
-        type: 'export',
-        kind,
-        name,
-        text: node.getText(),
-        line: lineNumber
-      });
-    }
-
-    ts.forEachChild(node, visit);
-  }
-
-  visit(sourceFile);
-  return declarations;
-}
-
-export function transformDeclarations(code: string, moduleName: string): string {
-  const declarations = parseDeclarations(code);
-
-  // 检查是否已经有 declare module
-  const hasModule = declarations.some(d => d.type === 'declare' && d.kind === 'module');
-
-  if (hasModule) {
     return code;
   }
 
-  // 获取所有 export 声明
-  const exportDeclarations = declarations.filter(d => d.type === 'export');
-  const declareDeclarations = declarations.filter(d => d.type === 'declare');
-
-  if (exportDeclarations.length === 0) {
-    console.log(`没有 export 声明，无需转换`);
-    return code;
+  private createModuleDeclarations(
+    code: string,
+    ref: string
+  ): string {
+    const key = this.dependency.name.replace(/[\/\-@]/g, '_')
+    let newContent = code + "\n";
+    newContent += `declare module '${this.dependencyModuleKey}' {\n`;
+    newContent += `import ${key} from "${ref.replace(/\.d\.ts$/, '')}";\n; export = ${key};\n`
+    newContent += "}\n";
+    return newContent;
   }
 
-  // 生成新的文件内容
-  let newContent = '';
-
-  // 分离 namespace 和 const 声明
-  const namespaceDeclarations = declareDeclarations.filter(d => d.kind === 'namespace');
-  const constDeclarations = declareDeclarations.filter(d => d.kind === 'const');
-  const otherDeclarations = declareDeclarations.filter(d => d.kind !== 'namespace' && d.kind !== 'const');
-
-  // 保留非冲突的 declare 声明（在 module 外部）
-  if (otherDeclarations.length > 0) {
-    otherDeclarations.forEach(decl => {
-      newContent += decl.text + '\n\n';
-    });
+  private createModuleDeclarationWrap(code: string) {
+    return `declare module '${this.dependencyModuleKey}' {\n${code}\n`
   }
 
-  // 过滤掉 export as namespace，因为在 declare module 中不需要
-  const validExports = exportDeclarations.filter(d => d.kind !== 'namespace');
+  private getDependencyModuleKey() {
+    const { version, name, registry } = this.dependency;
 
-  // 创建 declare module 包装
-  newContent += `declare module '${moduleName}' {\n`;
-
-  // 将 namespace 声明放入 module 中（去掉 declare 关键字）
-  namespaceDeclarations.forEach(decl => {
-    const namespaceText = decl.text.replace(/^declare\s+/, '');
-    const indentedText = namespaceText.split('\n').map(line => '  ' + line).join('\n');
-    newContent += indentedText + '\n\n';
-  });
-
-  // 将 const 声明放入 module 中（去掉 declare 关键字）
-  constDeclarations.forEach(decl => {
-    const constText = decl.text.replace(/^declare\s+/, '');
-    const indentedText = constText.split('\n').map(line => '  ' + line).join('\n');
-    newContent += indentedText + '\n';
-  });
-
-  // 将 export 声明放入 module 中
-  validExports.forEach(decl => {
-    const indentedText = decl.text.split('\n').map(line => '  ' + line).join('\n');
-    newContent += indentedText + '\n';
-  });
-
-  newContent += '}\n';
-  // 写入新文件
-  return newContent;
+    let key = name;
+    if (version) {
+      key = `${name}@${version}`;
+    }
+    if (registry) {
+      key = `${registry}:${key}`;
+    }
+    return key;
+  }
 }
-
-
