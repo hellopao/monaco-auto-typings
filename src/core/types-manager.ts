@@ -1,13 +1,9 @@
 import chunk from 'chunk';
-import path from 'path-browserify';
-import { concat } from 'uint8arrays/concat'
-import { TarLocalFile } from '@andrewbranch/untar.js';
-import { IDependency, IBuiltinTypes, IInternalOptions, ILogger, ITypesResult, ITsExtraLib } from '../types/index';
+import { IDependency, IBuiltinTypes, IInternalOptions, ILogger, IDependencyTypes, ITsExtraLib } from '../types/index';
 import { TypesCache } from './types-cache';
 import { RegistryFactory } from './registry-factory';
-import { escapeRegExp } from '../utils/index';
-import { DependencyParser } from './dependency-parser';
 import { BUILTIN_PACKAGES as BUILTIN_LIBS } from '../config';
+import { TypesGenerator } from './types-generator';
 
 /**
  * 类型管理器
@@ -93,32 +89,29 @@ export class TypesManager {
 	 * 获取依赖的类型定义内容
 	 */
 	public async fetchDependencyTypes(dependency: IDependency): Promise<Array<ITsExtraLib>> {
-		const libs: Array<ITsExtraLib> = [];
 		try {
-			const { registry, name, version, key } = dependency;
+			const { registry, name, version } = dependency;
 
 			if (!name) {
 				throw new Error('Dependency name cannot be empty');
 			}
 
-			let types = "";
-			let files: ITypesResult['files'] = [];
+			let dependencyTypes: IDependencyTypes;
 
 			// 根据不同的注册表获取类型定义文件
 			if (registry === "jsr") {
 				const jsrRegistry = RegistryFactory.getJSRRegistry();
-				const result = await jsrRegistry.getDependencyTypes({ name, version });
-				files = result.files;
+				dependencyTypes = await jsrRegistry.getDependencyTypes({ name, version });
 			} else {
 				const npmRegistry = RegistryFactory.getNPMRegistry(this.options.registry);
 
 				// 优先从模块自带类型中查找
-				let result = await npmRegistry.getDependencyTypes({ name, version });
+				dependencyTypes = await npmRegistry.getDependencyTypes({ name, version });
 
 				// 如果未找到类型定义，再从@types仓库查找
-				if (result.files.length === 0 && !name.startsWith('@types/') && !name.startsWith('@')) {
+				if (dependencyTypes.files.length === 0 && !name.startsWith('@types/') && !name.startsWith('@')) {
 					try {
-						result = await npmRegistry.getDependencyTypes({
+						dependencyTypes = await npmRegistry.getDependencyTypes({
 							name: `@types/${name.replace('@', '').replace('/', '__')}`,
 							version
 						});
@@ -126,85 +119,19 @@ export class TypesManager {
 						this.logger.warn(`No type definitions found for @types/${name}:`, error);
 					}
 				}
-
-				types = result.types;
-				files = result.files;
 			}
 
-			if (files.length === 0) {
+			if (dependencyTypes.files.length === 0) {
 				this.logger.warn(`No type definition files found for ${name}`);
 				return [];
 			}
 
-			if (types) {
-				const possiblePaths = [types, `package/${types}`, `${name}/${types}`, types.startsWith('./') ? types.slice(2) : types];
-				let typesFile: TarLocalFile | undefined;
-				for (const file of files) {
-					const matched = possiblePaths.find(path => path === file.name);
-					if (matched) {
-						typesFile = file;
-						break;
-					}
-				}
-				if (typesFile) {
-					const refs = DependencyParser.getReferencesFromTypes(new TextDecoder("utf-8").decode(typesFile.fileData))
-					const refFiles = refs.map(ref => {
-						const dir = path.join(path.dirname(typesFile.name), ref)
-						return files.find(item => item.name === dir)!;
-					});
-					files = [typesFile, ...refFiles];
-				}
-			}
-			// 生成模块名称
-			const moduleKey = `${name}${version ? `@${version}` : ''}`;
-
-			// 检查是否需要包装为declare module
-			const declareModuleReg = new RegExp(
-				`declare\\s+module\\s+['"\`]${escapeRegExp(moduleKey)}['"\`]`,
-				'g'
-			);
-
-			/**
-			 * TODO
-			 * create declaration
-			 */
-
-			// 处理类型定义文件内容
-			for (const file of files) {
-				try {
-					let content = new TextDecoder("utf-8").decode(file.fileData);
-
-					if (!content.trim()) {
-						this.logger.warn(`Type definition file ${file.name} is empty`);
-						continue;
-					}
-
-					const newModuleKey = registry ? `${registry}:${moduleKey}` : moduleKey;
-
-					// 如果类型定义中没有declare module声明，则添加一个
-					if (!declareModuleReg.test(content)) {
-						content = `declare module '${newModuleKey}' {\n${content}\n}`;
-					} else {
-						// 替换已有的declare module声明
-						content = content.replace(
-							declareModuleReg,
-							`declare module '${newModuleKey}'`
-						);
-					}
-
-					libs.push({
-						key: name,
-						filename: file.name,
-						content
-					});
-				} catch (error) {
-					this.logger.error(`Failed to process type definition file ${file.name}:`, error);
-				}
-			}
+			const typesGenerator = new TypesGenerator(dependency, dependencyTypes);
+			return typesGenerator.generate();
 		} catch (error) {
 			this.logger.error(`Failed to get type definitions for ${dependency.name}:`, error);
 		}
-		return libs;
+		return [];
 	}
 
 	/**
@@ -272,7 +199,7 @@ export class TypesManager {
 			for (const file of files) {
 				try {
 					const content = new TextDecoder("utf-8").decode(file.fileData);
-					libs.push({ key: lib, filename: file.name, content });
+					libs.push({ filepath: file.name, content });
 				} catch (error) {
 					this.logger.error(`Failed to decode file ${file.name}:`, error);
 				}
