@@ -8,7 +8,7 @@ export type ILanguage = "javascript" | "typescript";
 /**
  * 内置类型支持
  */
-export type IBuiltinTypes = "typescript" | "node" | "deno" | "bun";
+export type IBuiltinLib = "typescript" | "node" | "deno" | "bun";
 
 /**
  * 依赖项信息接口
@@ -31,7 +31,7 @@ export interface IAutoTypingsOptions {
   /** 防抖延迟时间(毫秒) */
   debounce?: number;
   /** 内置类型支持配置 */
-  builtins?: Record<IBuiltinTypes, boolean>;
+  builtins?: Record<IBuiltinLib, boolean>;
   /** 是否启用详细日志 */
   verbose?: boolean;
   /** 最大并发请求数 */
@@ -76,17 +76,6 @@ export interface ITsExtraLib {
   /** .d.ts文件内容 */
   content: string;
 }
-
-/**
- * 类型文件声明信息
- */
-export interface IDeclarationInfo {
-  type: "declare" | "export";
-  kind: string;
-  name: string;
-  text: string;
-}
-
 
 /**
  * 日志工具接口
