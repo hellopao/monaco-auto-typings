@@ -68,10 +68,12 @@
 		const code = `
 import fs from 'npm:fs-extra';
 import path from 'node:path'
-import dayjs from 'dayjs'
+import dayjs from 'dayjs@latest'
 import crypto from 'crypto'
 import glob from 'npm:fast-glob'
 import { deepMerge } from 'jsr:@std/collections'
+import _ from 'lodash'
+import React from 'npm:react'
 `;
 
 		function getOptions() {
