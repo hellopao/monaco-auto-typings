@@ -1,28 +1,33 @@
 import chunk from 'chunk';
-import { IDependency, IBuiltinTypes, IInternalOptions, ILogger, IDependencyTypes, ITsExtraLib } from '../types/index';
-import { TypesCache } from './types-cache';
-import { RegistryFactory } from './registry-factory';
+import { IDependency, IBuiltinLib, IInternalOptions, ILogger, IDependencyTypes, ITsExtraLib } from '../types/index';
+import { getDependencyTypesFromNpmRegistry, getDependencyTypesFromJsrRegistry } from './types-fetcher';
 import { BUILTIN_PACKAGES as BUILTIN_LIBS } from '../config';
 import { TypesGenerator } from './types-generator';
 
 /**
  * 类型管理器
+ * 负责协调类型的获取、生成和缓存
  */
 export class TypesManager {
-	private cache: TypesCache;
 	private options: IInternalOptions;
 	private logger: ILogger;
 
+	// 缓存相关属性
+	private typesCache = new Set<string>();
+	private loadingDependencies = new Set<string>();
+
+	/**
+	 * 创建类型管理器实例
+	 */
 	constructor(options: IInternalOptions, logger: ILogger) {
-		this.cache = TypesCache.getInstance();
 		this.options = options;
 		this.logger = logger;
 	}
 
 	/**
-	 * 加载依赖的类型定义
+	 * 生成依赖的类型定义
 	 */
-	public async createDenpendencyTypes(dependencies: IDependency[]): Promise<Array<ITsExtraLib>> {
+	public async createDenpendenciesExtraLibs(dependencies: IDependency[]): Promise<Array<ITsExtraLib>> {
 		if (dependencies.length === 0) {
 			this.logger.info('No external dependencies found');
 			return [];
@@ -32,8 +37,8 @@ export class TypesManager {
 
 		// 过滤已加载和正在加载的依赖
 		const newDependencies = dependencies.filter(dep => {
-			const key = `${dep.name}@${dep.version || 'latest'}`;
-			return !this.cache.has(key) && !this.cache.isLoading(key);
+			const key = this.getDependencyKey(dep);
+			return !this.typesCache.has(key) && !this.loadingDependencies.has(key);
 		});
 
 		if (newDependencies.length === 0) {
@@ -44,51 +49,52 @@ export class TypesManager {
 		// 限制并发数量
 		const chunks: Array<IDependency[]> = chunk(newDependencies, this.options.maxConcurrency);
 
-		const types: Array<ITsExtraLib> = [];
+		const libs: Array<ITsExtraLib> = [];
 		for (const chunk of chunks) {
 			const result = await Promise.all(
-				chunk.map(dependency => this.loadSingleDependencyTypes(dependency))
+				chunk.map(async dependency => {
+					const types = await this.loadSingleDependencyTypes(dependency);
+					if (!types) return [];
+					const typesGenerator = new TypesGenerator(dependency, types);
+					const result = typesGenerator.generate();
+					return result;
+				})
 			);
-			types.push(...result.flat());
+			libs.push(...result.flat());
 		}
-		return types;
+		return libs;
 	}
 
 	/**
 	 * 加载单个依赖的类型定义
 	 */
-	private async loadSingleDependencyTypes(dependency: IDependency): Promise<Array<ITsExtraLib>> {
-		const key = `${dependency.name}@${dependency.version || 'latest'}`;
+	private async loadSingleDependencyTypes(dependency: IDependency): Promise<IDependencyTypes | null> {
+		const key = this.getDependencyKey(dependency);
 
-		if (this.cache.has(key) || this.cache.isLoading(key)) {
-			return [];
+		if (this.typesCache.has(key) || this.loadingDependencies.has(key)) {
+			return null;
 		}
 
-		this.cache.setLoading(key);
-		this.cache.add(key);
+		this.loadingDependencies.add(key);
+		this.typesCache.add(key);
 
 		try {
 			this.logger.info(`Loading type definitions for ${dependency.name}`);
 			const types = await this.fetchDependencyTypes(dependency);
 
-			if (types && types.length > 0) {
-				this.logger.info(`Successfully loaded type definitions for ${dependency.name}`);
-			} else {
-				this.logger.warn(`No type definitions found for ${dependency.name}`);
-			}
 			return types;
 		} catch (error) {
 			this.logger.error(`Failed to load type definitions for ${dependency.name}:`, error);
-			return [];
+			return null;
 		} finally {
-			this.cache.removeLoading(key);
+			this.loadingDependencies.delete(key);
 		}
 	}
 
 	/**
-	 * 获取依赖的类型定义内容
+	 * 获取依赖的类型
 	 */
-	public async fetchDependencyTypes(dependency: IDependency): Promise<Array<ITsExtraLib>> {
+	public async fetchDependencyTypes(dependency: IDependency): Promise<IDependencyTypes | null> {
 		try {
 			const { registry, name, version } = dependency;
 
@@ -98,71 +104,56 @@ export class TypesManager {
 
 			let dependencyTypes: IDependencyTypes;
 
-			// 根据不同的注册表获取类型定义文件
+			// 根据不同的源获取类型定义文件
 			if (registry === "jsr") {
-				const jsrRegistry = RegistryFactory.getJSRRegistry();
-				dependencyTypes = await jsrRegistry.getDependencyTypes({ name, version });
+				dependencyTypes = await getDependencyTypesFromJsrRegistry(name, version);
 			} else {
-				const npmRegistry = RegistryFactory.getNPMRegistry(this.options.registry);
-
 				// 优先从模块自带类型中查找
-				dependencyTypes = await npmRegistry.getDependencyTypes({ name, version });
+				dependencyTypes = await getDependencyTypesFromNpmRegistry(name, version, this.options.registry);
 
 				// 如果未找到类型定义，再从@types仓库查找
 				if (dependencyTypes.files.length === 0 && !name.startsWith('@types/') && !name.startsWith('@')) {
 					try {
-						dependencyTypes = await npmRegistry.getDependencyTypes({
-							name: `@types/${name.replace('@', '').replace('/', '__')}`,
-							version
-						});
+						dependencyTypes = await getDependencyTypesFromNpmRegistry(
+							`@types/${name.replace('@', '').replace('/', '__')}`,
+							version, this.options.registry
+						);
 					} catch (error) {
 						this.logger.warn(`No type definitions found for @types/${name}:`, error);
 					}
 				}
 			}
 
-			if (dependencyTypes.files.length === 0) {
-				this.logger.warn(`No type definition files found for ${name}`);
-				return [];
-			}
-
-			const typesGenerator = new TypesGenerator(dependency, dependencyTypes);
-			return typesGenerator.generate();
+			return dependencyTypes;
 		} catch (error) {
 			this.logger.error(`Failed to get type definitions for ${dependency.name}:`, error);
 		}
-		return [];
+		return null;
 	}
 
 	/**
 	 * 加载内置类型定义
 	 */
-	public async createBuiltinTypes(): Promise<Array<ITsExtraLib>> {
+	public async createBuiltinExtraLibs(libs: IBuiltinLib[]): Promise<Array<ITsExtraLib>> {
 		try {
 			this.logger.info('Starting to load built-in type definitions');
 
-			const builtinEntries = Object.entries(this.options.builtins || {});
-			const builtinPromises = builtinEntries
-				.filter(([_, enabled]) => enabled)
-				.map(async ([name]) => {
-					try {
-						this.logger.info(`Loading built-in types for ${name}`);
-						const types = await this.fetchBuiltinLibTypes(name as IBuiltinTypes);
+			const result = await Promise.all(libs.map(async name => {
+				try {
+					this.logger.info(`Loading built-in types for ${name}`);
+					const types = await this.fetchBuiltinLibTypes(name as IBuiltinLib);
 
-						if (types && types.length > 0) {
-							this.logger.info(`Successfully loaded built-in types for ${name}`);
-						} else {
-							this.logger.warn(`No built-in types found for ${name}`);
-						}
-						return types;
-					} catch (error) {
-						this.logger.error(`Failed to load built-in types for ${name}:`, error);
-						return [];
+					if (types && types.length > 0) {
+						this.logger.info(`Successfully loaded built-in types for ${name}`);
+					} else {
+						this.logger.warn(`No built-in types found for ${name}`);
 					}
-				});
-
-			this.logger.info('Built-in type definitions loading completed');
-			const result = await Promise.all(builtinPromises);
+					return types;
+				} catch (error) {
+					this.logger.error(`Failed to load built-in types for ${name}:`, error);
+					return [];
+				}
+			}));
 			return result.flat();
 		} catch (error) {
 			this.logger.error('Error loading built-in type definitions:', error);
@@ -173,7 +164,7 @@ export class TypesManager {
 	/**
 	 * 获取内置类型定义
 	 */
-	public async fetchBuiltinLibTypes(lib: IBuiltinTypes): Promise<Array<ITsExtraLib>> {
+	public async fetchBuiltinLibTypes(lib: IBuiltinLib): Promise<Array<ITsExtraLib>> {
 		const libs: Array<ITsExtraLib> = [];
 		try {
 			if (!lib) {
@@ -185,10 +176,8 @@ export class TypesManager {
 
 			this.logger.info(`Getting built-in ${lib} types: ${builtinLibTypesName}`);
 
-			const npmRegistry = RegistryFactory.getNPMRegistry(this.options.registry);
-
 			// 获取类型定义文件
-			const { files } = await npmRegistry.getDependencyTypes({ name: builtinLibTypesName, version: "" });
+			const { files } = await getDependencyTypesFromNpmRegistry(builtinLibTypesName, "", this.options.registry);
 
 			if (files.length === 0) {
 				this.logger.warn(`No built-in type definitions found for ${lib}`);
@@ -209,4 +198,12 @@ export class TypesManager {
 		}
 		return libs;
 	}
+
+	/**
+	 * 从依赖生成缓存键
+	 */
+	private getDependencyKey(dependency: IDependency): string {
+		return `${dependency.name}@${dependency.version || 'latest'}`;
+	}
+
 }
