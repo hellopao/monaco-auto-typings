@@ -1,8 +1,8 @@
 import debounceFn from "debounce";
 import deepMerge from "deepmerge";
-import { IAutoTypingsOptions, IInternalOptions, ITsExtraLib } from '../types/index';
+import { IAutoTypingsOptions, IBuiltinLib, IInternalOptions, ITsExtraLib } from '../types/index';
 import { isValidUrl, createLogger } from '../utils/index';
-import { DependencyParser } from './dependency-parser';
+import { getDependenciesFromImports, getImportsFromSourceCode } from './dependency-parser';
 import { TypesManager } from './types-manager';
 import { DEFAULT_OPTIONS } from '../config/index';
 
@@ -53,9 +53,10 @@ export class MonacoAutoTypings {
 	public initialize(monaco: Monaco, editor: MonacoEditor): { dispose: () => void } {
 		try {
 			// 加载内置类型定义
-			if (this.options.builtins && Object.values(this.options.builtins).some(Boolean)) {
-				this.typesManager.createBuiltinTypes().then(types => {
-					this.createTypescriptExtraLibs(monaco, types);
+			const builtinLibs = Object.keys(this.options.builtins).filter(key => this.options.builtins[key as IBuiltinLib]) as IBuiltinLib[];
+			if (builtinLibs.length > 0) {
+				this.typesManager.createBuiltinExtraLibs(builtinLibs).then(libs => {
+					this.addTypescriptExtraLibs(monaco, libs);
 				}).catch(error => {
 					this.logger.error('Failed to load built-in types:', error);
 				});
@@ -67,6 +68,9 @@ export class MonacoAutoTypings {
 			this.disposable = editor.onDidChangeModelContent(debouncedHandler);
 
 			this.logger.info('Monaco Auto Typings plugin initialization completed');
+
+			// 立即执行一次处理函数
+			changeHandler();
 
 			return {
 				dispose: () => this.dispose()
@@ -80,10 +84,9 @@ export class MonacoAutoTypings {
 	/**
 	 * 添加类型定义
 	 */
-	private createTypescriptExtraLibs(monaco: Monaco, libs: Array<ITsExtraLib>) {
+	private addTypescriptExtraLibs(monaco: Monaco, libs: Array<ITsExtraLib>) {
 		libs.forEach(lib => {
-			const { key, filename, content } = lib;
-			const filepath = `${key}/${filename}`;
+			const { filepath, content } = lib;
 			if (this.options.languages.includes('javascript')) {
 				monaco.languages.typescript.javascriptDefaults.addExtraLib(content, filepath);
 			}
@@ -112,10 +115,11 @@ export class MonacoAutoTypings {
 				}
 
 				this.logger.info('Starting code dependency analysis');
-				const dependencies = DependencyParser.analyzeDependencies(code);
+				const imports = getImportsFromSourceCode(code);
+				const dependencies = getDependenciesFromImports(imports);
 
-				const types = await this.typesManager.createDenpendencyTypes(dependencies);
-				this.createTypescriptExtraLibs(monaco, types)
+				const extraLibs = await this.typesManager.createDenpendenciesExtraLibs(dependencies);
+				this.addTypescriptExtraLibs(monaco, extraLibs)
 			} catch (error) {
 				this.logger.error('Error processing code changes:', error);
 			}
