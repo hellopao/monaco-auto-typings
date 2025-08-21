@@ -1,6 +1,6 @@
 import { assertEquals } from "@std/assert";
 
-import { DependencyParser } from '../src/core/dependency-parser.ts'
+import { getImportsFromSourceCode, getDependenciesFromImports } from '../src/core/dependency-parser.ts'
 import { TypesManager } from '../src/core/types-manager.ts'
 
 const registry = "https://registry.npmjs.org";
@@ -12,10 +12,17 @@ import fs from 'npm:fs-extra@10.0.0'
 import express from 'express'
 `;
 
-const typesManager = new TypesManager({ registry, debounce: 200, verbose: true, maxConcurrency: 4, builtins: { typescript: true, node: true, deno: true, bun: false }}, console)
+const typesManager = new TypesManager({ 
+  registry, 
+  debounce: 200, 
+  verbose: true, 
+  maxConcurrency: 4, 
+  builtins: { typescript: true, node: true, deno: true, bun: false },
+  languages: ['typescript']
+}, console)
 
 Deno.test("getImportsFromSourceCode", () => {
-  const imports = DependencyParser.getImportsFromSourceCode(code);
+  const imports = getImportsFromSourceCode(code);
   assertEquals(imports, [
     "jsr:@std/async",
     "jsr:@std/assert",
@@ -26,8 +33,8 @@ Deno.test("getImportsFromSourceCode", () => {
 });
 
 Deno.test("getDependenciesFromImports", () => {
-  const imports = DependencyParser.getImportsFromSourceCode(code);
-  const dependencies = DependencyParser.getDependenciesFromImports(imports);
+  const imports = getImportsFromSourceCode(code);
+  const dependencies = getDependenciesFromImports(imports);
   assertEquals(dependencies, [
     { name: "@std/async", version: "", registry: "jsr" },
     { name: "@std/assert", version: "", registry: "jsr" },
@@ -70,5 +77,11 @@ Deno.test("getDependencyTypes#jsr:@std/async", async () => {
 Deno.test("getDependencyTypes#npm:dayjs", async () => {
   const types = await typesManager.fetchDependencyTypes(
     { name: "dayjs", version: "", registry: "npm" },
+  );
+});
+
+Deno.test("getDependencyTypes#npm:lodash", async () => {
+  const types = await typesManager.fetchDependencyTypes(
+    { name: "lodash", version: "", registry: "npm" },
   );
 });
