@@ -47,7 +47,7 @@ export class TypesGenerator {
     return files.map(file => {
       const code = new TextDecoder("utf-8").decode(file.fileData);
       return {
-        filepath: file.name,
+        filepath: this.getExtraLibFilePath(file.name),
         content: this.createModuleDeclarationWrap(code)
       }
     });
@@ -75,6 +75,17 @@ export class TypesGenerator {
     const entryTypes = this.getEntryTypes(code, entryFile);
 
     return [...entryTypes, ...referenceTypes];
+  }
+
+  /**
+   * 获取extralib文件路径
+   */
+  private getExtraLibFilePath(filepath: string) {
+    const { name } = this.dependency;
+    if (filepath.startsWith(name)) {
+      return filepath;
+    }
+    return `${name}/${filepath}`;
   }
 
   /**
@@ -112,7 +123,7 @@ export class TypesGenerator {
       const current = files.find(item => item.name === filename);
       if (current) {
         types.push({
-          filepath: current.name,
+          filepath: this.getExtraLibFilePath(current.name),
           content: new TextDecoder("utf-8").decode(current.fileData)
         })
       }
@@ -132,7 +143,7 @@ export class TypesGenerator {
     const transformedCode = this.replaceModuleDeclarationWrap(code);
 
     types.push({
-      filepath: entryFile.name,
+      filepath: this.getExtraLibFilePath(entryFile.name),
       content: transformedCode
     });
 
@@ -142,7 +153,7 @@ export class TypesGenerator {
       const entryCode = `import ${this.dependencyExportKey} from "${entryName}";\n  export = ${this.dependencyExportKey};\n`;
 
       types.push({
-        filepath: `${this.dependency.name}/__types__.d.ts`,
+        filepath: this.getExtraLibFilePath('__types__.d.ts'),
         content: this.createModuleDeclarationWrap(entryCode),
       });
     }
